@@ -1,12 +1,64 @@
-# React + Vite
+# Arabic-English Voice Translator Chrome Extension
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A powerful Chrome extension that enables seamless translation between Arabic and English with voice input/output capabilities.
 
-Currently, two official plugins are available:
+## 🎯 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- 🎤 Voice recognition in Arabic and English
+- 🔄 Bidirectional translation (Arabic ↔ English)
+- 🔊 Text-to-speech in both languages
+- 🌐 Quick translation on any webpage
+- 📋 Copy to clipboard functionality
+- ⚡ Fast and lightweight
 
-## Expanding the ESLint configuration
+## 🛠 Technologies Used
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+- React 18
+- Chrome Extension Manifest V3
+- Web Speech API
+- Google Translate API
+- Modern CSS with animations
+
+## 📥 Installation
+
+1. Download or clone this repository
+2. Open Chrome and go to `chrome://extensions/`
+3. Enable "Developer mode"
+4. Click "Load unpacked" and select the extension folder
+5. Pin the extension to your toolbar
+
+## 🎥 Demo
+
+[Link to your YouTube video]
+
+## 🚀 Usage
+
+1. Click the extension icon in Chrome toolbar
+2. Choose translation mode (Arabic → English or English → Arabic)
+3. Either type text or click record to use voice input
+4. Get instant translation with option to hear it spoken
+5. Copy translation to clipboard
+
+## 📱 Screenshots
+
+![Popup Interface](screenshots/popup-demo.png)
+![Web Integration](screenshots/web-integration.png)
+
+## 🤝 Contributing
+
+Feel free to submit issues and enhancement requests!
+
+## 📄 License
+
+MIT License - see [LICENSE](LICENSE) file for details.
+
+## 👩‍💻 Author
+
+**Priya** - https://github.com/Priya-raja
+- YouTube: [myAI Journey]
+- LinkedIn: https://www.linkedin.com/in/priya-raja-web/
+
+## 🙏 Acknowledgments
+
+- Built as part of TSAI course Assignment #1
+- Powered by Cursor AI for rapid development
