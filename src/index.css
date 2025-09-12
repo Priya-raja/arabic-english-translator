@@ -1,0 +1,148 @@
+/* Base layout for popup */
+html, body {
+  margin: 0;
+  padding: 0;
+}
+body {
+  width: 450px;  /* Increased from 400px to give more space */
+  min-height: 520px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen,
+    Ubuntu, Cantarell, 'Fira Sans', 'Droid Sans', 'Helvetica Neue', Arial, sans-serif;
+  color: #1f2937; /* gray-800 */
+  background: linear-gradient(135deg, #eff6ff 0%, #f0f9ff 100%);
+}
+
+/* Header */
+.header {
+  background: #ffffff;
+  border-bottom: 1px solid #e5e7eb; /* gray-200 */
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.header__title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.header__tabs {
+  display: flex;
+  gap: 6px;
+}
+.tab {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  color: #4b5563; /* gray-600 */
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.tab--active {
+  background: #dbeafe; /* primary-100 */
+  color: #1d4ed8; /* primary-700 */
+}
+
+/* Container */
+.container {
+  padding: 16px;
+  max-width: 100%;
+  box-sizing: border-box;  /* This ensures padding is included in width calculation */
+}
+
+/* Inputs */
+.field-label {
+  font-size: 12px;
+  color: #374151; /* gray-700 */
+  margin-bottom: 4px;
+}
+.select {
+  width: 160px;
+  padding: 8px 10px;
+  border: 1px solid #d1d5db; /* gray-300 */
+  border-radius: 8px;
+  font-size: 13px;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+/* Cards */
+.card {
+  background: #ffffff;
+  border: 1px solid #e5e7eb; /* gray-200 */
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+  max-width: 100%;  /* Ensures card doesn't overflow container */
+  box-sizing: border-box;
+}
+.card + .card { margin-top: 12px; }
+.card__title {
+  margin: 0 0 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151; /* gray-700 */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.card__subtitle { font-size: 11px; color: #6b7280; }
+
+/* Buttons */
+.btn {
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, transform .05s ease;
+  white-space: nowrap;  /* Prevents button text from wrapping */
+  max-width: 100%;     /* Ensures button stays within container */
+}
+.btn:active { transform: translateY(1px); }
+.btn--primary {
+  background: #2563eb;
+  color: #ffffff;
+  padding: 8px 12px;
+}
+.btn--primary:hover { background: #1d4ed8; }
+.btn--secondary {
+  background: #e5e7eb;
+  color: #111827;
+  padding: 6px 10px;
+}
+.btn--secondary:hover { background: #d1d5db; }
+
+/* Mic */
+.mic-wrap { display: flex; flex-direction: column; align-items: center; }
+.mic {
+  width: 80px; height: 80px; border-radius: 9999px;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; border: 2px solid rgba(0,0,0,.08);
+  background: #2563eb;
+}
+.mic--rec { background: #ef4444; }
+.mic__hint { margin-top: 8px; font-size: 12px; color: #6b7280; }
+.mic__hint--rec { color: #ef4444; }
+
+/* Helpers */
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;  /* Allows items to wrap if needed */
+  margin-bottom: 8px;  /* Add some vertical spacing */
+}
+.col { display: flex; flex-direction: column; gap: 4px; }
+.center { display:flex; justify-content:center; }
+
+/* Alert */
+.alert { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; border-radius: 8px; padding: 10px; font-size: 13px; }
+
+/* Info */
+.info { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; border-radius: 8px; padding: 12px; font-size: 12px; }
+.info h4 { margin: 0 0 6px 0; font-size: 13px; }
+.info ul { margin: 0; padding-left: 16px; }
+.info li { margin-bottom: 4px; }
