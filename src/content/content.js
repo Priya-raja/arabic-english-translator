@@ -1,32 +1,195 @@
-// content.js - Handles text selection on webpages
+// content.js - Fixed version
 let translationTooltip = null;
 let isTooltipVisible = false;
 let currentSelection = '';
 let selectionTimeout = null;
+let geminiInitialized = false;
+let geminiLoadPromise = null;
+let translationEnabled = true;
+let autoTranslateOnSelection = false; // Changed default to false
 
+if (chrome.storage && chrome.storage.onChanged) {
+  chrome.storage.onChanged.addListener((changes, namespace) => {
+    if (namespace === 'local' && changes.geminiApiKey) {
+      console.log('🔄 API key updated, reinitializing Gemini...');
+      geminiInitialized = false;
+      geminiLoadPromise = null;
+      
+      if (window.geminiAI && changes.geminiApiKey.newValue) {
+        window.geminiAI.apiKey = changes.geminiApiKey.newValue;
+        window.geminiAI.initialized = true;
+        geminiInitialized = true;
+        console.log('✅ Gemini API key updated in content script');
+      }
+    }
+  });
+}
 
-// Import Gemini service for translation
-const script = document.createElement('script');
-script.src = chrome.runtime.getURL('gemini-service.js');
-document.head.appendChild(script);
+async function loadSettings() {
+  try {
+    const result = await chrome.storage.local.get(['extensionSettings']);
+    const settings = result.extensionSettings || {};
+    
+    // Fixed: Default to false for auto-translate to prevent unwanted popups
+    autoTranslateOnSelection = settings.autoTranslateOnSelection === true;
+    translationEnabled = settings.translationEnabled !== false;
+    
+    console.log('Settings loaded:', { autoTranslateOnSelection, translationEnabled });
+  } catch (error) {
+    console.log('Could not load settings:', error);
+    // Fallback defaults
+    autoTranslateOnSelection = false;
+    translationEnabled = true;
+  }
+}
 
-// Initialize after Gemini service loads
+// Call this when content script loads
+loadSettings();
+
+// Add message listener for settings updates
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  switch (request.action) {
+    case 'reload-settings':
+      loadSettings(); // Reload settings when changed
+      sendResponse({ success: true });
+      break;
+      
+    case 'translate':
+      handleContextMenuTranslation(request);
+      sendResponse({ success: true });
+      break;
+      
+    case 'ai-enhance':
+      handleContextMenuAIEnhancement(request);
+      sendResponse({ success: true });
+      break;
+      
+    case 'translate-selection-shortcut':
+      handleKeyboardShortcut();
+      sendResponse({ success: true });
+      break;
+      
+    case 'toggle-tooltip':
+      toggleTooltipVisibility();
+      sendResponse({ success: true });
+      break;
+      
+    default:
+      sendResponse({ error: 'Unknown action' });
+  }
+  
+  return true;
+});
+
+// Single Gemini initialization function
+async function initializeGemini() {
+  if (geminiLoadPromise) {
+    return geminiLoadPromise;
+  }
+  
+  if (window.geminiAI && window.geminiAI.initialized) {
+    geminiInitialized = true;
+    return true;
+  }
+
+  geminiLoadPromise = new Promise(async (resolve, reject) => {
+    try {
+      console.log('🔍 Initializing Gemini in content script...');
+      
+      // Enhanced API key retrieval with multiple attempts
+      let apiKey = null;
+      let attempts = 0;
+      const maxAttempts = 5;
+      
+      while (!apiKey && attempts < maxAttempts) {
+        try {
+          const result = await chrome.storage.local.get(['geminiApiKey']);
+          apiKey = result.geminiApiKey;
+          console.log(`Attempt ${attempts + 1}: API key found:`, !!apiKey);
+          
+          if (!apiKey) {
+            // Wait a bit and try again
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          console.error(`Storage access attempt ${attempts + 1} failed:`, error);
+        }
+        attempts++;
+      }
+      
+      if (!apiKey) {
+        console.log('❌ No API key found after multiple attempts');
+        resolve(false);
+        return;
+      }
+      
+      console.log('✅ API key retrieved, loading Gemini service...');
+      
+      // Load script only if not already present
+      if (!document.querySelector('script[src*="gemini-service.js"]')) {
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('gemini-service.js');
+        
+        script.onload = async () => {
+          console.log('📜 Gemini script loaded, waiting for service...');
+          let serviceAttempts = 0;
+          while (!window.geminiAI && serviceAttempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 250));
+            serviceAttempts++;
+          }
+          
+          if (window.geminiAI) {
+            window.geminiAI.apiKey = apiKey;
+            window.geminiAI.initialized = true;
+            geminiInitialized = true;
+            console.log('✅ Gemini AI fully initialized with API key');
+            resolve(true);
+          } else {
+            console.log('❌ window.geminiAI not available after loading');
+            resolve(false);
+          }
+        };
+        
+        script.onerror = () => {
+          console.error('❌ Failed to load gemini-service.js');
+          resolve(false);
+        };
+        
+        document.head.appendChild(script);
+      } else {
+        // Script already loaded, just initialize
+        if (window.geminiAI) {
+          window.geminiAI.apiKey = apiKey;
+          window.geminiAI.initialized = true;
+          geminiInitialized = true;
+          console.log('✅ Gemini AI re-initialized with existing script');
+          resolve(true);
+        } else {
+          console.log('❌ Script loaded but window.geminiAI not available');
+          resolve(false);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Gemini initialization error:', error);
+      resolve(false);
+    }
+  });
+  
+  return geminiLoadPromise;
+}
+
+initializeGemini();
+
 setTimeout(() => {
   initializeTextSelection();
 }, 1000);
 
 function initializeTextSelection() {
-  // Create translation tooltip element
   createTranslationTooltip();
   
-  // Listen for text selection
   document.addEventListener('mouseup', handleTextSelection);
   document.addEventListener('keyup', handleTextSelection);
-  
-  // Hide tooltip when clicking elsewhere
   document.addEventListener('click', handleClickOutside);
-  
-  // Handle keyboard shortcuts
   document.addEventListener('keydown', handleKeyboardShortcuts);
 }
 
@@ -85,38 +248,86 @@ function createTranslationTooltip() {
   `;
   
   document.body.appendChild(translationTooltip);
-  
-  // Add event listeners
   addTooltipEventListeners();
 }
 
 function addTooltipEventListeners() {
-  // Close button
-  translationTooltip.querySelector('.tooltip-close').addEventListener('click', hideTooltip);
+  // Fixed: More robust close button handling
+  const closeBtn = translationTooltip.querySelector('.tooltip-close');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      hideTooltip();
+    });
+  }
   
   // Swap languages
-  translationTooltip.querySelector('.tooltip-swap').addEventListener('click', swapLanguages);
+  const swapBtn = translationTooltip.querySelector('.tooltip-swap');
+  if (swapBtn) {
+    swapBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      swapLanguages();
+    });
+  }
   
   // Language selectors
-  translationTooltip.querySelector('#source-lang').addEventListener('change', retranslate);
-  translationTooltip.querySelector('#target-lang').addEventListener('change', retranslate);
+  const sourceLang = translationTooltip.querySelector('#source-lang');
+  const targetLang = translationTooltip.querySelector('#target-lang');
+  if (sourceLang) sourceLang.addEventListener('change', retranslate);
+  if (targetLang) targetLang.addEventListener('change', retranslate);
   
   // Action buttons
-  translationTooltip.querySelector('.copy-btn').addEventListener('click', copyTranslation);
-  translationTooltip.querySelector('.speak-btn').addEventListener('click', speakTranslation);
-  translationTooltip.querySelector('.ai-btn').addEventListener('click', enhanceWithAI);
+  const copyBtn = translationTooltip.querySelector('.copy-btn');
+  const speakBtn = translationTooltip.querySelector('.speak-btn');
+  const aiBtn = translationTooltip.querySelector('.ai-btn');
+  
+  if (copyBtn) {
+    copyBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      copyTranslation();
+    });
+  }
+  
+  if (speakBtn) {
+    speakBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      speakTranslation();
+    });
+  }
+  
+  if (aiBtn) {
+    aiBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      enhanceWithAI();
+    });
+  }
   
   // Prevent tooltip from closing when clicking inside
-  translationTooltip.addEventListener('click', (e) => e.stopPropagation());
+  translationTooltip.addEventListener('click', (e) => {
+    e.stopPropagation();
+  });
 }
 
 function handleTextSelection(event) {
-  // Clear previous timeout
+  // Fixed: Check both settings properly
+  if (!translationEnabled) {
+    return;
+  }
+  
+  // Only auto-show if the setting is enabled
+  if (!autoTranslateOnSelection) {
+    return;
+  }
+  
   if (selectionTimeout) {
     clearTimeout(selectionTimeout);
   }
   
-  // Add small delay to ensure selection is complete
   selectionTimeout = setTimeout(() => {
     const selection = window.getSelection();
     const selectedText = selection.toString().trim();
@@ -133,16 +344,13 @@ function handleTextSelection(event) {
 function showTooltip(event, text) {
   if (!translationTooltip) return;
   
-  // Update selected text display
   translationTooltip.querySelector('#selected-text').textContent = text;
   
-  // Clear previous translation
   const translationResult = translationTooltip.querySelector('.translation-text');
   const loadingSpinner = translationTooltip.querySelector('.loading-spinner');
   translationResult.textContent = '';
   loadingSpinner.classList.add('hidden');
   
-  // Auto-detect language and set selectors
   const isArabic = /[\u0600-\u06FF]/.test(text);
   const sourceLang = translationTooltip.querySelector('#source-lang');
   const targetLang = translationTooltip.querySelector('#target-lang');
@@ -155,14 +363,11 @@ function showTooltip(event, text) {
     targetLang.value = 'ar';
   }
   
-  // Position tooltip near selection
   positionTooltip(event);
   
-  // Show tooltip
   translationTooltip.classList.remove('hidden');
   isTooltipVisible = true;
   
-  // Start translation
   translateText(text);
 }
 
@@ -171,7 +376,6 @@ function positionTooltip(event) {
   let x = event.clientX;
   let y = event.clientY;
   
-  // Try to get selection rectangle for better positioning
   if (selection.rangeCount > 0) {
     const range = selection.getRangeAt(0);
     const rect = range.getBoundingClientRect();
@@ -179,12 +383,10 @@ function positionTooltip(event) {
     y = rect.bottom + 10;
   }
   
-  // Ensure tooltip stays within viewport
   const tooltipRect = translationTooltip.getBoundingClientRect();
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
   
-  // Adjust horizontal position
   if (x + 200 > viewportWidth) {
     x = viewportWidth - 220;
   }
@@ -192,9 +394,8 @@ function positionTooltip(event) {
     x = 10;
   }
   
-  // Adjust vertical position
   if (y + 300 > viewportHeight) {
-    y = event.clientY - 320; // Show above selection
+    y = event.clientY - 320;
   }
   if (y < 10) {
     y = 10;
@@ -204,22 +405,27 @@ function positionTooltip(event) {
   translationTooltip.style.top = y + 'px';
 }
 
+// Fixed: More robust hide function
 function hideTooltip() {
-  if (translationTooltip) {
+  if (translationTooltip && isTooltipVisible) {
     translationTooltip.classList.add('hidden');
-    translationTooltip.querySelector('.ai-enhancement').classList.add('hidden');
+    const aiEnhancement = translationTooltip.querySelector('.ai-enhancement');
+    if (aiEnhancement) {
+      aiEnhancement.classList.add('hidden');
+    }
     isTooltipVisible = false;
+    console.log('Tooltip hidden');
   }
 }
 
 function handleClickOutside(event) {
-  if (isTooltipVisible && !translationTooltip.contains(event.target)) {
+  if (isTooltipVisible && translationTooltip && !translationTooltip.contains(event.target)) {
     hideTooltip();
   }
 }
 
 function handleKeyboardShortcuts(event) {
-  // Ctrl+Shift+T to translate selected text
+  // Ctrl+Shift+T always works regardless of auto-translate setting
   if (event.ctrlKey && event.shiftKey && event.key === 'T') {
     event.preventDefault();
     const selection = window.getSelection();
@@ -232,10 +438,12 @@ function handleKeyboardShortcuts(event) {
   
   // Escape to hide tooltip
   if (event.key === 'Escape' && isTooltipVisible) {
+    event.preventDefault();
     hideTooltip();
   }
 }
 
+// ... (rest of your functions remain the same)
 async function translateText(text) {
   const loadingSpinner = translationTooltip.querySelector('.loading-spinner');
   const translationResult = translationTooltip.querySelector('.translation-text');
@@ -250,22 +458,18 @@ async function translateText(text) {
   loadingSpinner.classList.remove('hidden');
   
   try {
-    // Try API translation first
     let translation = await translateViaAPI(text, sourceLang, targetLang);
     
-    // Fallback to demo translation
     if (!translation) {
       translation = await demoTranslate(text, sourceLang, targetLang);
     }
     
-    // Final fallback
     if (!translation) {
       translation = text + ' (translation unavailable)';
     }
     
     translationResult.textContent = translation;
     
-    // Save to history
     saveTranslationToHistory({
       originalText: text,
       translatedText: translation,
@@ -283,9 +487,7 @@ async function translateText(text) {
 }
 
 async function translateViaAPI(text, from, to) {
-  // Use the same translation logic from your main component
   try {
-    // Lingva Translate
     const response = await fetch(`https://lingva.ml/api/v1/${from}/${to}/${encodeURIComponent(text)}`);
     if (response.ok) {
       const data = await response.json();
@@ -296,7 +498,6 @@ async function translateViaAPI(text, from, to) {
   }
   
   try {
-    // MyMemory
     const response = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${from}|${to}`);
     if (response.ok) {
       const data = await response.json();
@@ -357,7 +558,6 @@ function copyTranslation() {
   const translationText = translationTooltip.querySelector('.translation-text').textContent;
   if (translationText) {
     navigator.clipboard.writeText(translationText).then(() => {
-      // Show brief feedback
       const copyBtn = translationTooltip.querySelector('.copy-btn');
       const originalText = copyBtn.textContent;
       copyBtn.textContent = '✓ Copied!';
@@ -395,10 +595,29 @@ async function enhanceWithAI() {
   aiEnhancement.classList.remove('hidden');
   
   try {
-    // Check if Gemini AI is available
-    if (typeof window.geminiAI === 'undefined') {
-      throw new Error('Gemini AI not initialized. Please set up your API key.');
+    console.log('🧠 Starting AI enhancement...');
+    
+    // Force re-initialization if not working
+    if (!geminiInitialized || !window.geminiAI || !window.geminiAI.initialized) {
+      console.log('🔄 Gemini not ready, initializing...');
+      geminiLoadPromise = null; // Reset promise
+      const initialized = await initializeGemini();
+      
+      if (!initialized) {
+        throw new Error('API key not found. Please set your Gemini API key in the extension settings.');
+      }
     }
+
+    // Double-check everything is ready
+    if (!window.geminiAI) {
+      throw new Error('Gemini service not loaded. Please refresh the page and try again.');
+    }
+    
+    if (!window.geminiAI.apiKey) {
+      throw new Error('API key missing. Please check your extension settings.');
+    }
+    
+    console.log('✅ Calling Gemini API for enhancement...');
     
     const sourceLangName = sourceLang === 'ar' ? 'Arabic' : 'English';
     const targetLangName = targetLang === 'ar' ? 'Arabic' : 'English';
@@ -409,6 +628,8 @@ async function enhanceWithAI() {
       sourceLangName,
       targetLangName
     );
+    
+    console.log('✅ AI enhancement successful');
     
     enhancementContent.innerHTML = `
       <div class="ai-result">
@@ -439,10 +660,17 @@ async function enhanceWithAI() {
     `;
     
   } catch (error) {
+    console.error('❌ AI enhancement failed:', error);
+    
+    let helpMessage = 'Try refreshing the page and setting your API key again.';
+    if (error.message.includes('API key')) {
+      helpMessage = 'Click the extension icon → Settings (⚙️) → Enter your Gemini API key';
+    }
+    
     enhancementContent.innerHTML = `
       <div class="ai-error">
-        ❌ AI Enhancement failed: ${error.message}
-        <br><small>Make sure to set up your Gemini API key in the extension settings.</small>
+        ❌ ${error.message}
+        <br><small>${helpMessage}</small>
       </div>
     `;
   }
@@ -452,74 +680,36 @@ async function saveTranslationToHistory(translationData) {
   try {
     const result = await chrome.storage.local.get(['translationHistory']);
     const history = result.translationHistory || [];
-    const newHistory = [translationData, ...history].slice(0, 50); // Keep last 50
+    const newHistory = [translationData, ...history].slice(0, 50);
     await chrome.storage.local.set({ translationHistory: newHistory });
   } catch (error) {
     console.log('Could not save translation history:', error);
   }
 }
 
-// Listen for messages from background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  switch (request.action) {
-    case 'translate':
-      handleContextMenuTranslation(request);
-      sendResponse({ success: true });
-      break;
-      
-    case 'ai-enhance':
-      handleContextMenuAIEnhancement(request);
-      sendResponse({ success: true });
-      break;
-      
-    case 'translate-selection-shortcut':
-      handleKeyboardShortcut();
-      sendResponse({ success: true });
-      break;
-      
-    case 'toggle-tooltip':
-      toggleTooltipVisibility();
-      sendResponse({ success: true });
-      break;
-      
-    default:
-      sendResponse({ error: 'Unknown action' });
-  }
-  
-  return true; // Keep message channel open
-});
-
-// Handle context menu translation
+// Additional context menu and keyboard shortcut handlers
 async function handleContextMenuTranslation(request) {
   const { text, sourceLang, targetLang } = request;
   
-  // Create a fake event object for positioning
   const fakeEvent = {
     clientX: window.innerWidth / 2,
     clientY: window.innerHeight / 2
   };
   
-  // Set current selection
   currentSelection = text;
-  
-  // Show tooltip with translation
   showTooltip(fakeEvent, text);
   
-  // Set the language selectors
   if (translationTooltip) {
     translationTooltip.querySelector('#source-lang').value = sourceLang;
     translationTooltip.querySelector('#target-lang').value = targetLang;
   }
   
-  // Translate
   await translateText(text);
 }
 
-// Handle context menu AI enhancement
 async function handleContextMenuAIEnhancement(request) {
   const { text, type } = request;
   
-  // Create a fake event for positioning
   const fakeEvent = {
     clientX: window.innerWidth / 2,
     clientY: window.innerHeight / 2
@@ -528,7 +718,6 @@ async function handleContextMenuAIEnhancement(request) {
   currentSelection = text;
   showTooltip(fakeEvent, text);
   
-  // Auto-detect language
   const isArabic = /[\u0600-\u06FF]/.test(text);
   const sourceLang = isArabic ? 'ar' : 'en';
   const targetLang = isArabic ? 'en' : 'ar';
@@ -538,26 +727,21 @@ async function handleContextMenuAIEnhancement(request) {
     translationTooltip.querySelector('#target-lang').value = targetLang;
   }
   
-  // First translate, then enhance
   await translateText(text);
   
-  // Wait a bit for translation to complete
   setTimeout(async () => {
     switch (type) {
       case 'enhance':
         await enhanceWithAI();
         break;
       case 'grammar':
-        // Add grammar analysis here
         break;
       case 'pronunciation':
-        // Add pronunciation help here
         break;
     }
   }, 1000);
 }
 
-// Handle keyboard shortcut for translation
 function handleKeyboardShortcut() {
   const selection = window.getSelection();
   const selectedText = selection.toString().trim();
@@ -573,7 +757,6 @@ function handleKeyboardShortcut() {
   }
 }
 
-// Toggle tooltip visibility
 function toggleTooltipVisibility() {
   if (isTooltipVisible) {
     hideTooltip();
@@ -593,7 +776,6 @@ function toggleTooltipVisibility() {
   }
 }
 
-// Auto-inject on compatible pages
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeTextSelection);
 } else {

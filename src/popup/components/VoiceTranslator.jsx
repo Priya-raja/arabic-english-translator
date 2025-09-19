@@ -126,6 +126,24 @@ const PronunciationResult = ({ data }) => (
 
 const SettingsModal = ({ onClose }) => {
   const [apiKey, setApiKey] = useState('')
+  const [autoTranslate, setAutoTranslate] = useState(false) // Add this state
+  
+  // Load settings when modal opens
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const result = await chrome.storage.local.get(['extensionSettings', 'geminiApiKey'])
+        if (result.geminiApiKey) {
+          setApiKey(result.geminiApiKey)
+        }
+        const settings = result.extensionSettings || {}
+        setAutoTranslate(settings.autoTranslateOnSelection !== false) // Default true
+      } catch (error) {
+        console.log('Could not load settings')
+      }
+    }
+    loadSettings()
+  }, [])
   
   const saveApiKey = async () => {
     if (apiKey.trim()) {
@@ -142,6 +160,26 @@ const SettingsModal = ({ onClose }) => {
       } catch (error) {
         alert('❌ Failed to save API key: ' + error.message)
       }
+    }
+  }
+
+  // Add this function to save settings
+  const saveSettings = async (newSettings) => {
+    try {
+      const result = await chrome.storage.local.get(['extensionSettings'])
+      const currentSettings = result.extensionSettings || {}
+      const updatedSettings = { ...currentSettings, ...newSettings }
+      
+      await chrome.storage.local.set({ extensionSettings: updatedSettings })
+      
+      // Notify content scripts to reload settings
+      chrome.tabs.query({}, (tabs) => {
+        tabs.forEach(tab => {
+          chrome.tabs.sendMessage(tab.id, { action: 'reload-settings' }).catch(() => {})
+        })
+      })
+    } catch (error) {
+      console.log('Could not save settings')
     }
   }
   
@@ -166,7 +204,7 @@ const SettingsModal = ({ onClose }) => {
         maxWidth: 400,
         boxShadow: '0 10px 25px rgba(0,0,0,0.3)'
       }}>
-        <h3 style={{ marginBottom: 16, color: '#333' }}>⚙️ AI Settings</h3>
+        <h3 style={{ marginBottom: 16, color: '#333' }}>⚙️ Extension Settings</h3>
         
         <div style={{ marginBottom: 16 }}>
           <label style={{ display: 'block', marginBottom: 8, fontWeight: 'bold' }}>
@@ -189,6 +227,25 @@ const SettingsModal = ({ onClose }) => {
             Get your free API key from <a href="https://aistudio.google.com" target="_blank" rel="noopener noreferrer">aistudio.google.com</a>
           </div>
         </div>
+
+        {/* ADD THIS NEW SECTION */}
+        <div style={{ marginBottom: 16, padding: 12, background: '#f8f9fa', borderRadius: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+            <input 
+              type="checkbox" 
+              checked={autoTranslate}
+              onChange={(e) => {
+                setAutoTranslate(e.target.checked)
+                saveSettings({ autoTranslateOnSelection: e.target.checked })
+              }}
+              style={{ width: 16, height: 16 }}
+            />
+            <span style={{ fontWeight: 'bold' }}>Auto-translate on text selection</span>
+          </label>
+          <div style={{ fontSize: 12, color: '#666', marginTop: 4, marginLeft: 24 }}>
+            When disabled, use <kbd>Ctrl+Shift+T</kbd> or right-click menu to translate
+          </div>
+        </div>
         
         <div style={{ display: 'flex', gap: 12, justifyContent: 'flex-end' }}>
           <button
@@ -208,7 +265,6 @@ const SettingsModal = ({ onClose }) => {
     </div>
   )
 }
-
 // Conversation History Component
 const ConversationHistory = ({ translations, onClearHistory }) => {
   if (!translations || translations.length === 0) {
@@ -525,6 +581,7 @@ const [aiError, setAiError] = useState('')
 const [showSettings, setShowSettings] = useState(false)
 const [activeTab, setActiveTab] = useState('translate') // Add this
 const [allTranslations, setAllTranslations] = useState([]) // Add this
+const [autoTranslate, setAutoTranslate] = useState(false);
 
   const recognitionRef = useRef(null)
   const latestTextRef = useRef('')
@@ -565,7 +622,18 @@ const [allTranslations, setAllTranslations] = useState([]) // Add this
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceLang])
 
-
+useEffect(() => {
+  const loadSettings = async () => {
+    try {
+      const result = await window.chrome.storage.local.get(['extensionSettings']);
+      const settings = result.extensionSettings || {};
+      setAutoTranslate(settings.autoTranslateOnSelection !== false);
+    } catch (error) {
+      console.log('Could not load settings');
+    }
+  };
+  loadSettings();
+}, []);
   // Add this useEffect after your existing useEffect
 useEffect(() => {
   // Load translation history from storage
@@ -706,6 +774,8 @@ const mapChromeToISO = (code) => {
   if (code.startsWith('en')) return 'en'
   return 'auto'
 }
+
+
 
   const speak = () => {
     if (!translation || !window.speechSynthesis) return
