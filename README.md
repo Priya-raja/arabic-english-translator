@@ -29,7 +29,7 @@ A powerful Chrome extension that enables seamless translation between Arabic and
 
 ## 🎥 Demo
 
-[Link to your YouTube video]
+https://youtu.be/rzAU17xzKQo?si=j7FgUoOs-HiWUK8z
 
 ## 🚀 Usage
 
@@ -55,7 +55,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 ## 👩‍💻 Author
 
 **Priya** - https://github.com/Priya-raja
-- YouTube: [myAI Journey]
+- YouTube: https://www.youtube.com/@AIJourneywithPriya
 - LinkedIn: https://www.linkedin.com/in/priya-raja-web/
 
 ## 🙏 Acknowledgments
