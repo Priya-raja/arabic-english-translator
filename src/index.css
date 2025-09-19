@@ -146,3 +146,63 @@ body {
 .info h4 { margin: 0 0 6px 0; font-size: 13px; }
 .info ul { margin: 0; padding-left: 16px; }
 .info li { margin-bottom: 4px; }
+
+/* AI Enhancement Styles */
+.ai-card {
+  border: 2px solid #3498db !important;
+  background: linear-gradient(135deg, #f8f9ff 0%, #e8f4f8 100%) !important;
+}
+
+.btn--ai {
+  background: linear-gradient(45deg, #ff6b6b, #ffd93d) !important;
+  color: #333 !important;
+  font-weight: bold;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn--ai:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(255,107,107,0.3);
+}
+
+.btn--ai:disabled {
+  opacity: 0.6;
+  transform: none;
+  cursor: not-allowed;
+}
+
+.spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #3498db;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.ai-result {
+  margin-top: 16px;
+  padding: 16px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ai-result h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+}
+
+.ai-result h5 {
+  margin: 12px 0 8px 0;
+  font-size: 14px;
+}

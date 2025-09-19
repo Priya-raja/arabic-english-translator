@@ -3,14 +3,15 @@ import react from '@vitejs/plugin-react'
 import { viteStaticCopy } from 'vite-plugin-static-copy'
 import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [
     react(),
     viteStaticCopy({
       targets: [
         { src: 'public/manifest.json', dest: '.' },
-        { src: 'public/icons', dest: '.' }
+        { src: 'public/icons', dest: '.' },
+        { src: 'src/gemini-service.js', dest: '.' },
+        { src: 'src/content/content.css', dest: '.' }
       ]
     })
   ],
@@ -18,7 +19,7 @@ export default defineConfig({
     outDir: 'dist',
     rollupOptions: {
       input: {
-        popup: path.resolve(__dirname, 'src/popup/index.html'),
+        popup: path.resolve(__dirname, 'src/popup/main.jsx'),
         background: path.resolve(__dirname, 'src/background/background.js'),
         content: path.resolve(__dirname, 'src/content/content.js'),
       },
@@ -26,16 +27,11 @@ export default defineConfig({
         entryFileNames: (chunkInfo) => {
           if (chunkInfo.name === 'background') return 'background.js'
           if (chunkInfo.name === 'content') return 'content.js'
+          if (chunkInfo.name === 'popup') return 'assets/popup.js'
           return 'assets/[name].js'
         },
         chunkFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name && assetInfo.name.endsWith('.css')) {
-            if (assetInfo.name.includes('content')) return 'content.css'
-            if (assetInfo.name.includes('popup')) return 'popup.css'
-          }
-          return 'assets/[name][extname]'
-        }
+        assetFileNames: 'assets/[name][extname]'
       }
     }
   }
